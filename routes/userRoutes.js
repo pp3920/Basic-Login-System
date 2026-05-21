@@ -1,99 +1,92 @@
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
 const express = require("express");
 const router = express.Router();
-const User = require("../models/User");
+const jwt = require("jsonwebtoken");
 
-// POST /api/users/register
+const User = require("../model/User");
+
+
+// REGISTER ROUTE
 router.post("/register", async (req, res) => {
+
     try {
-        // Get data from request body
+
         const { username, email, password } = req.body;
 
-        // Check if user already exists
+        // Check existing user
         const existingUser = await User.findOne({ email });
 
         if (existingUser) {
             return res.status(400).json({
-                message: "User already exists with this email"
+                message: "User already exists"
             });
         }
 
-        // Create new user
+        // Create user
         const newUser = new User({
             username,
             email,
             password
         });
 
-        // Save user to database
-        // Pre-save hook will hash password automatically
+        // Save user
         await newUser.save();
 
-        // Remove password from response
-        const userResponse = {
+        // Response without password
+        res.status(201).json({
             _id: newUser._id,
             username: newUser.username,
             email: newUser.email
-        };
-
-        // Send success response
-        res.status(201).json({
-            message: "User registered successfully",
-            user: userResponse
         });
 
     } catch (error) {
+
         res.status(500).json({
-            message: "Server Error",
-            error: error.message
+            message: error.message
         });
     }
 });
 
 
-// POST /api/users/login
+// LOGIN ROUTE
 router.post("/login", async (req, res) => {
+
     try {
 
-        // Get email and password from request body
         const { email, password } = req.body;
 
-        // Find user by email
+        // Find user
         const user = await User.findOne({ email });
 
-        // If user does not exist
         if (!user) {
             return res.status(400).json({
                 message: "Incorrect email or password"
             });
         }
 
-        // Compare passwords
-        // Using instance method from model
+        // Check password
         const correctPassword = await user.isCorrectPassword(password);
 
-        // If password is incorrect
         if (!correctPassword) {
             return res.status(400).json({
                 message: "Incorrect email or password"
             });
         }
 
-        // Create JWT payload
-        const payload = {
-            _id: user._id,
-            username: user.username
-        };
-
-        // Sign token
+        // Create token
         const token = jwt.sign(
-            payload,
+            {
+                _id: user._id,
+                username: user.username
+            },
             process.env.JWT_SECRET,
             { expiresIn: "1d" }
         );
 
         // Send response
-        res.status(200).json({
-            message: "Login successful",
+        res.json({
             token,
             user: {
                 _id: user._id,
@@ -103,9 +96,9 @@ router.post("/login", async (req, res) => {
         });
 
     } catch (error) {
+
         res.status(500).json({
-            message: "Server Error",
-            error: error.message
+            message: error.message
         });
     }
 });
